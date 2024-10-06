@@ -7,7 +7,7 @@ from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button
 
 encounter_list = [
     [Celestial("Angel"), Celestial("Angel")],
-    [Celestial("Angel"), Celestial("Angel")],
+    [Celestial("Angel"), Celestial("Angel"), Celestial("Angel")],
     [Celestial("Angel"), Celestial("Angel")],
     [Celestial("Angel"), Celestial("Angel")]
 ]
@@ -279,5 +279,6 @@ class Game:
                         pygame.quit()
                     
             clock.tick(60)
+
 
         pygame.quit()  # Clean up

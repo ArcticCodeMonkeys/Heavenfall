@@ -41,12 +41,20 @@ def draw_hand(screen, hand, holding, held_idx):
         if(held_idx != idx or not holding):
             card.rect = pygame.Rect(hand_start_x + idx * (card_width + padding), screen.get_height() - card_height - PADDING, card_width, card_height)
             screen.blit(card.img, card.rect)
+            font = pygame.font.Font(None, 24)
+            cost_text = font.render(f"{card.cost}", True, (255, 255, 255))
+            pygame.draw.circle(screen, (255,0,0), (card.rect.x + 5, card.rect.y + 5), 10)
+            screen.blit(cost_text, (card.rect.x - 2, card.rect.y - 2))
 
 def draw_held(screen, held, mouse_pos):
     card_width = 80
     card_height = 120
     padding = 10
     screen.blit(held.img, (mouse_pos[0] - card_width // 2, mouse_pos[1] - card_height // 2))
+    font = pygame.font.Font(None, 24)
+    cost_text = font.render(f"{held.cost}", True, (255, 255, 255))
+    pygame.draw.circle(screen, (255,0,0), (mouse_pos[0] - card_width // 2 + 5, mouse_pos[1] - card_height // 2 + 5), 10)
+    screen.blit(cost_text, (mouse_pos[0] - card_width // 2, mouse_pos[1] - card_height // 2 - 2))
     
 def draw_deck(screen, deck_pos):
     # Draw deck icon in the bottom right corner
