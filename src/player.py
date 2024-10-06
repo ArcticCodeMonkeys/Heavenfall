@@ -3,10 +3,9 @@ class Player:
         from demon import Demon
         self.health = health
         self.mana = mana
-        self.deck = []  # A list of Demon objects
-        self.hand = [Demon('Quasit', 1, 3, 1)]  # Cards drawn into hand
+        self.deck = [Demon('Quasit', 1, 3, 1)]*9  # A list of Demon objects
+        self.hand = [Demon('Quasit', 1, 3, 1), Demon('Quasit', 1, 3, 1), Demon('Quasit', 1, 3, 1)]  # Cards drawn into hand
         self.board = []  # Summoned demons on the board
-        self.summon_demon(self.hand[0])
 
     def draw_card(self):
         if len(self.deck) > 0:

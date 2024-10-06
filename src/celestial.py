@@ -1,61 +1,47 @@
 import random
-
+import pygame
+UNIT_WIDTH = 180
+UNIT_HEIGHT = 256
 class Celestial:
     def __init__(self, name):
         stats = {
-            "Angel":[40, ["3x3","1x12","+10"]]
+            "Angel": [40, ["3x1", "1x3"]]
         }
         self.actions = stats[name][1]
         self.name = name
         self.hp = stats[name][0]
         self.hpMax = stats[name][0]
         self.dmg_modifier = 1
-    def onHit(self):
-        if(self.name == 'Angel'):
-            self.heal(2)
-    def act(self, enemies, allies):
-        from demon import Demon
-        action = self.actions[random.randint(0, len(self.actions))]
-        if("x" in action):
-            # Attack
-            targets = action[:action.find("x")]
-            damage = int(action[action.find('x')+1:])
-            if(targets == 'a'):
-                for enemy in enemies:
-                    enemy.take_damage(damage*self.dmg_modifier)
-                    self.take_damage(enemy.attack)
-                    self.onHit()
-            else:
-                for _ in range(int(targets)):
-                    target = random.randint(0, len(enemies))
-                    enemies[target].take_damage(damage*self.dmg_modifier)
-        if("+" in action):
-            if("[" in action):
-                # Heal Ally
-                allies[int(action[3])].heal(int(action[5:]))
-            else:
-                # Heal Self
-                self.heal(int(action[1:]))
-        if("*" in action):
-            if("/" in action):
-                # Debuff
-                target = random.randint(0, len(enemies))
-                enemies[target].dmg_modifer *= action[1]/action[3]
-            else:
-                # Buff
-                target = random.randint(0, len(allies))
-                allies[target].dmg_modifier
-        
-    def heal(self, amt):
-        self.hp += amt
-        self.hp = min(self.hp, self.hpMax)
-    
-            
+        self.alive = True
+        self.boardImg = pygame.transform.smoothscale(pygame.image.load(f'assets/{self.name}.jpg'), (UNIT_WIDTH, UNIT_HEIGHT))
+
     def take_damage(self, dmg):
         self.hp -= dmg
         if self.hp <= 0:
             self.die()
 
     def die(self):
-        # Logic to remove from enemy lineup
-        pass
+        self.alive = False
+
+    def choose_action(self, demons):
+        if not self.alive:
+            return
+        
+        action = random.choice(self.actions)
+        target_count, damage = self.parse_action(action)
+        
+        if target_count == "a":  # "a" for all
+            for demon in demons:
+                demon.take_damage(damage)
+        else:
+            for _ in range(target_count):
+                if demons:
+                    target = random.choice(demons)
+                    target.take_damage(damage)
+
+    def parse_action(self, action):
+        # Example: "3x12" -> target_count = 3, damage = 12
+        targets, damage = action.split("x")
+        if targets == "a":
+            return "a", int(damage)
+        return int(targets), int(damage)
