@@ -239,6 +239,10 @@ class Game:
 
     def run(self):
         pygame.init()  # Initialize Pygame
+        pygame.mixer.init()
+        pygame.mixer.music.load('assets/background_music.mp3')
+        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.play(-1)  # -1 makes the music loop indefinitely
         screen_info = pygame.display.Info()
         screen_width = screen_info.current_w
         screen_height = screen_info.current_h
