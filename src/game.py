@@ -1,8 +1,9 @@
 import pygame
 import random
+import copy
 from player import Player
 from celestial import Celestial
-from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held
+from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held, draw_arrows, draw_unit, UNIT_WIDTH, UNIT_HEIGHT, PADDING
 
 encounter_list = [
     [Celestial("Angel"), Celestial("Angel")]
@@ -12,14 +13,15 @@ MAX_HAND_SIZE = 10
 MAX_MANA = 10
 CARD_DRAW = 1
 START_MANA = 3
-ANIMATION_SPEED = 1
+ANIMATION_ACCEL = 2
+ANIMATION_MAX_SPEED = 50
 
 class Game:
     def __init__(self):
         self.state = "battle"
         self.player = Player(30, START_MANA)
         self.enemies = []  # List of Celestial enemies in the current battle
-        self.turn = 3  # 1 for player, 2 for enemies, 3 for begin player turn
+        self.turn = 1  # 1 for player, 2 for enemies, 3 for begin player turn
         self.round_count = 0
         self.dragging_card = None  # Track if a card is being dragged
         self.dragged_index = None  # Track the index of the dragged card
@@ -28,25 +30,46 @@ class Game:
         self.attacking_card = None
         self.attacking_target = None
         self.is_animating = False
+        self.returning = False
         self.card_start_pos = None
         self.card_end_pos = None
         self.card_current_pos = None
         self.background = pygame.image.load(f'assets/heaven.jpg')
+        self.attack_queue = []  # List of (attacker, target) pairs for animation
+        self.animation_speed = 5
+        self.selected_demon = None
+        self.selected_celestial = None
+        self.drawn_card = None
+        self.hand_pos = None
+        self.deck_pos = None
 
     def start_turn(self):
+        self.resolve_deaths()
+        for d in self.player.board:
+            d.passive(self.player.board, self.enemies, "Start Turn")
+        if(len(self.player.deck)):
+            new_card = random.choice(self.player.deck)
+            self.player.deck.remove(new_card)
+            self.player.hand.append(new_card)
+        self.attack_queue = []
         self.turn = 1
-        # Gain mana
-        self.player.mana = min(START_MANA+self.round_count, MAX_MANA)
-        # Draw cards, up to the hand size limit
-        self.draw_cards(CARD_DRAW)
+        self.player.mana = min(START_MANA + self.round_count, MAX_MANA)
 
     def end_player_turn(self):
+        from demon import Demon
+        for attacker, enemy in self.attack_queue:
+            if(type(attacker) == Demon):
+                enemy.take_damage(attacker.attack * attacker.dmg_modifier)
         for celestial in self.enemies:
-            celestial.choose_action(self.player.board)
-            self.resolve_deaths()
-        
-        self.round_count += 1
-        self.turn = 3
+            targets = celestial.choose_action(self.player.board)
+            for d in self.player.board:
+                d.passive(self.player.board, self.enemies, "Attacked")
+            if(targets != None):
+                for target in targets:
+                    self.attack_queue.append((celestial, target))  # Queue attacker-target pairs
+                    self.attack_queue.append((celestial, Celestial("Angel", celestial.rect)))
+        self.draw_cards(CARD_DRAW)
+        self.turn = 3  # Switch to animation mode
 
     def resolve_deaths(self):
         # Remove dead demons and celestials from their respective lists
@@ -55,10 +78,10 @@ class Game:
 
     def draw_cards(self, amount):
         for _ in range(amount):
-            if len(self.player.hand) < MAX_HAND_SIZE:
-                card = random.choice(self.player.deck)  # Simplified card draw
-                self.player.hand.append(card)
-    
+            if len(self.player.hand) < MAX_HAND_SIZE and len(self.player.deck) > 0:
+                self.attack_queue.append((Celestial('deck', pygame.Rect(self.deck_pos)), Celestial("Angel", self.hand_pos)))
+                self.attack_queue.append((Celestial('deck', pygame.Rect(10000, 0, 1, 1)), (Celestial('deck', pygame.Rect(10000, 1.6, 1, 1)))))
+                
     def handle_input(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             # Check if clicking on a card in hand
@@ -69,10 +92,31 @@ class Game:
                     break
             if self.end_turn_button.collidepoint(event.pos):
                 self.end_player_turn()
+            # Check if clicking on a card on board
+            for demon in self.player.board:
+                if demon.rect.collidepoint(event.pos):
+                    self.selected_demon = demon
+                    return
+
+            # Check if clicking on a celestial (after selecting a demon)
+            if self.selected_demon:
+                for celestial in self.enemies:
+                    if celestial.rect.collidepoint(event.pos):
+                        self.selected_celestial = celestial
+                        self.attack_queue.append((self.selected_demon, self.selected_celestial))
+                        self.attack_queue.append((self.selected_demon, Celestial("Angel", self.selected_demon.rect)))
+                        self.selected_demon = None  # Reset selection
+                        self.selected_celestial = None
+                        return
+
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.dragging_card:
                 if self.board.collidepoint(event.pos) and self.player.mana >= self.dragging_card.cost:
                     self.player.board.append(self.dragging_card)
+                    self.dragging_card.passive(self.player.board, self.enemies, "Summon")
+                    for d in self.player.board:
+                        if d.name == "Lucifer":
+                            self.dragging_card.attack += 6
                     self.player.hand.pop(self.dragged_index)
                     self.player.mana -= self.dragging_card.cost
                 self.dragging_card = None  # Stop dragging the card after drop
@@ -81,33 +125,81 @@ class Game:
         self.enemies = encounter_list[random.randint(0, len(encounter_list) - 1)]
 
     def animate_attack(self, attacking_card, target_card):
+        """Initiate the attack animation."""
         self.is_animating = True
+        if(self.returning):
+            self.animation_speed = ANIMATION_MAX_SPEED
         self.attacking_card = attacking_card
         self.attacking_target = target_card
         self.card_start_pos = pygame.Vector2(attacking_card.rect.x, attacking_card.rect.y)
         self.card_end_pos = pygame.Vector2(target_card.rect.x, target_card.rect.y)
         self.card_current_pos = self.card_start_pos
 
-    def update_animation(self):
+    def update_animation(self, screen):
+        self.refresh_screen(screen)
+        """Handle the ongoing attack animation and queue the next one."""
         if self.is_animating and self.attacking_card and self.attacking_target:
-            direction = (self.card_end_pos - self.card_current_pos).normalize()  # Calculate direction to target
-            distance_to_target = self.card_current_pos.distance_to(self.card_end_pos)
+            self.animation_speed *= ANIMATION_ACCEL
+            self.animation_speed = min(self.animation_speed, ANIMATION_MAX_SPEED)
+            # Move attacking card towards the target or back to the start
+            if self.card_current_pos != self.card_end_pos:
+                # Phase 1: Move attacking card towards the target
+                direction = (self.card_end_pos - self.card_current_pos).normalize()
+                distance_to_target = self.card_current_pos.distance_to(self.card_end_pos)
 
-            if distance_to_target > 10:  # Continue moving toward target
-                self.card_current_pos += direction * ANIMATION_SPEED
-                self.attacking_card.rect.topleft = (int(self.card_current_pos.x), int(self.card_current_pos.y))
-            else:
-                # Move back to start position
-                direction_back = (self.card_start_pos - self.card_current_pos).normalize()
-                distance_to_start = self.card_current_pos.distance_to(self.card_start_pos)
-
-                if distance_to_start > 10:  # Continue moving back
-                    self.card_current_pos += direction_back * ANIMATION_SPEED
+                if distance_to_target > self.animation_speed:  # Continue moving towards the target
+                    self.card_current_pos += direction * self.animation_speed
                     self.attacking_card.rect.topleft = (int(self.card_current_pos.x), int(self.card_current_pos.y))
                 else:
-                    self.is_animating = False  # Animation finished
+                    # Phase 2: Attack reached target, switch to return phase
+                    self.card_current_pos = self.card_end_pos  # Snap to target position
+            else:
+                # Phase 2: Move attacking card back to the start position
+                # Calculate the direction only if there's a non-zero distance between the positions
+                if self.card_start_pos != self.card_current_pos:
+                    direction_back = (self.card_start_pos - self.card_current_pos).normalize()
+                else:
+                    direction_back = pygame.math.Vector2(0, 0)  # Or handle it accordingly
+
+                distance_to_start = self.card_current_pos.distance_to(self.card_start_pos)
+
+                if distance_to_start > self.animation_speed:  # Continue moving back to the start
+                    self.card_current_pos += direction_back * self.animation_speed
+                    self.attacking_card.rect.topleft = (int(self.card_end_pos.x), int(self.card_end_pos.y))
+                else:
+                    # Animation finished, snap back to start position and end animation
+                    self.attacking_card.rect.topleft = (int(self.card_end_pos.x), int(self.card_end_pos.y))
+                    self.is_animating = False  # End the animation
+                    self.animation_speed = 5
+                    self.returning = not self.returning
+
+            
+    def process_attack_queue(self):
+        """Process the attack queue one by one."""
+        if not self.is_animating and self.attack_queue:
+            attacker, target = self.attack_queue.pop(0)
+            self.animate_attack(attacker, target)
+        if(len(self.attack_queue) == 0):
+            self.is_animating = False
+            self.start_turn()
+
+    def refresh_screen(self, screen):
+        draw_board(screen, self.player, self.enemies, self.board, self.background, self.is_animating, self.attacking_card)
+        self.end_turn_button = draw_end_turn_button(screen)
+        if(len(self.player.deck) > 0):
+            draw_deck(screen, self.deck_pos)
+        draw_hand(screen, self.player.hand, self.dragging_card, self.dragged_index)
+        draw_mana(screen, self.player.mana, min(START_MANA+self.round_count, MAX_MANA))
+        if(self.turn != 3):
+            draw_arrows(screen, self.attack_queue)
+        if(self.attacking_card):
+            draw_unit(screen, self.attacking_card, self.attacking_card.rect.x, self.attacking_card.rect.y, self.attacking_card.rect.w, self.attacking_card.rect.h)
+        if self.dragging_card:
+            mouse_position = pygame.mouse.get_pos()
+            draw_held(screen, self.player.hand[self.dragged_index], mouse_position)
+        pygame.display.flip()
+
     def run(self):
-        
         pygame.init()  # Initialize Pygame
         screen_info = pygame.display.Info()
         screen_width = screen_info.current_w
@@ -116,6 +208,8 @@ class Game:
         pygame.display.set_caption("Heavenfall")  # Set window title
         clock = pygame.time.Clock()
         self.board = pygame.Rect(100, 400, screen.get_width() - 200, 250)
+        self.hand_pos = pygame.Rect(screen.get_width()//2 - UNIT_WIDTH, screen.get_height() - UNIT_HEIGHT, UNIT_WIDTH, UNIT_HEIGHT)
+        self.deck_pos = pygame.Rect(screen.get_width() - UNIT_WIDTH - PADDING, screen.get_height()-UNIT_HEIGHT - PADDING, UNIT_WIDTH, UNIT_HEIGHT)
         self.generate_encounter()
         running = True
         while running:
@@ -124,20 +218,17 @@ class Game:
                 if event.type == pygame.QUIT:
                     running = False  # Exit the game loop if the window is closed
                 self.handle_input(event)
-            if self.state == "battle":
-                draw_board(screen, self.player, self.enemies, self.board, self.background)
-                self.end_turn_button = draw_end_turn_button(screen)
-                draw_deck(screen)
-                draw_hand(screen, self.player.hand, self.dragging_card, self.dragged_index)
-                draw_mana(screen, self.player.mana, min(START_MANA+self.round_count, MAX_MANA))
-                if(self.dragging_card):
-                    mouse_position = pygame.mouse.get_pos()
-                    draw_held(screen, self.player.hand[self.dragged_index], mouse_position)
-                pygame.display.update()
-                if(self.turn == 3):
-                    self.start_turn()
 
-            # Add other game state handling here (e.g., reward phase)
-            pygame.display.flip()
+            if self.state == "battle":
+                
+                # Process the attack queue if we're in animation mode
+                if self.turn == 3:
+                    self.update_animation(screen)
+                    self.process_attack_queue()
+                else:
+                    self.refresh_screen(screen)
+
+            
             clock.tick(60)
+
         pygame.quit()  # Clean up

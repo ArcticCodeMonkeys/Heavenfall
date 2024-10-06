@@ -1,11 +1,11 @@
 import random
 import pygame
-UNIT_WIDTH = 180
-UNIT_HEIGHT = 256
+from UI import ENEMY_WIDTH, ENEMY_HEIGHT, UNIT_WIDTH, UNIT_HEIGHT
 class Celestial:
-    def __init__(self, name):
+    def __init__(self, name, rect=None):
         stats = {
-            "Angel": [40, ["3x1", "1x3"]]
+            "Angel": [10, ["4x1", "1x3"]],
+            "deck":[0, ["1x1","1x1"]]
         }
         self.actions = stats[name][1]
         self.name = name
@@ -13,7 +13,11 @@ class Celestial:
         self.hpMax = stats[name][0]
         self.dmg_modifier = 1
         self.alive = True
-        self.boardImg = pygame.transform.smoothscale(pygame.image.load(f'assets/{self.name}.jpg'), (UNIT_WIDTH, UNIT_HEIGHT))
+        self.rect = rect
+        if(self.name == 'deck'):
+            self.boardImg = pygame.transform.smoothscale(pygame.image.load(f'assets/{self.name}.jpg'), (UNIT_WIDTH, UNIT_HEIGHT))
+        else:
+            self.boardImg = pygame.transform.smoothscale(pygame.image.load(f'assets/{self.name}.jpg'), (ENEMY_WIDTH, ENEMY_HEIGHT))
 
     def take_damage(self, dmg):
         self.hp -= dmg
@@ -34,10 +38,13 @@ class Celestial:
             for demon in demons:
                 demon.take_damage(damage)
         else:
+            targets = []
             for _ in range(target_count):
                 if demons:
                     target = random.choice(demons)
                     target.take_damage(damage)
+                    targets.append(target)
+            return targets
 
     def parse_action(self, action):
         # Example: "3x12" -> target_count = 3, damage = 12
