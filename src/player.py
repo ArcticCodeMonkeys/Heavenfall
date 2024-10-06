@@ -3,7 +3,7 @@ class Player:
         from demon import Demon
         self.health = health
         self.mana = mana
-        self.deck = [Demon('Quasit'),Demon('Quasit'),Demon('Quasit'),Demon('Hellhound'),Demon('Hellhound'),Demon('Hellhound'),Demon('Succubus'),Demon('Rakshasa'),Demon('Pit Fiend'),Demon('Orcus'),Demon('Yeenoghu'),Demon('Zariel'),Demon('Imp'),Demon('Imp'),Demon('The Devil')]  # A list of Demon objects
+        self.deck = [Demon('Quasit'),Demon('Quasit'),Demon('Quasit'),Demon('Hellhound'),Demon('Hellhound'),Demon('Hellhound'),Demon('Succubus')]  # A list of Demon objects
         self.stored_deck = self.deck
         self.hand = []  # Cards drawn into hand
         self.board = []  # Summoned demons on the board

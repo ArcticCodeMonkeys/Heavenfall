@@ -107,6 +107,16 @@ def draw_arrows(screen, pairings):
         pygame.draw.line(screen, ARROW_COLOUR, end_pos, (left_x, left_y), ARROW_WIDTH)
         pygame.draw.line(screen, ARROW_COLOUR, end_pos, (right_x, right_y), ARROW_WIDTH)
 
+def draw_titlescreen(screen, background):
+    screen.fill((0, 0, 0))  # Clear screen with black background
+    background = pygame.transform.smoothscale(background, screen.get_size())
+    screen.blit(background, (0, 0))
+    font = pygame.font.Font(None, 256)
+    text = font.render("HEAVENFALL", True, (255, 0, 0))
+    screen.blit(text, (screen.get_width()//2 - text.get_width()//2, screen.get_height()//4))
+    font = pygame.font.Font(None, 64)
+    text = font.render("Click anywhere to begin", True, (255, 0, 0))
+    screen.blit(text, (screen.get_width()//2 - text.get_width()//2, screen.get_height()//2 - text.get_height()//2))
 
 def draw_board(screen, player, enemies, board, background, animating, attacking_card):
     screen.fill((0, 0, 0))  # Clear screen with black background

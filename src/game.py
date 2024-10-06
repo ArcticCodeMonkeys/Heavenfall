@@ -3,7 +3,7 @@ import random
 import copy
 from player import Player
 from celestial import Celestial
-from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held, draw_arrows, draw_unit, draw_health, UNIT_WIDTH, UNIT_HEIGHT, PADDING
+from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held, draw_arrows, draw_unit, draw_health, draw_titlescreen, UNIT_WIDTH, UNIT_HEIGHT, PADDING
 
 encounter_list = [
     [Celestial("Angel"), Celestial("Angel")],
@@ -11,6 +11,19 @@ encounter_list = [
     [Celestial("Angel"), Celestial("Angel")],
     [Celestial("Angel"), Celestial("Angel")]
 ]
+
+demon_list = [
+    "Quasit",
+    "Imp",
+    "Hellhound",
+    "Orcus",
+    "Pit Fiend",
+    "Rakshasa",
+    "Succubus",
+    "Yeenoghu",
+    "Zariel"
+]
+
 # Basic settings
 MAX_HAND_SIZE = 10
 MAX_MANA = 10
@@ -23,7 +36,7 @@ MAX_HEALTH = 10
 
 class Game:
     def __init__(self):
-        self.state = "battle"
+        self.state = "title"
         self.player = Player(MAX_HEALTH, START_MANA)
         self.enemies = []  # List of Celestial enemies in the current battle
         self.turn = 1  # 1 for player, 2 for enemies, 3 for begin player turn
@@ -48,14 +61,17 @@ class Game:
         self.hand_pos = None
         self.deck_pos = None
         self.last = self.player.board
+        self.secret_counter = 0
 
     def start_turn(self):
         for d in self.player.board:
             d.passive(self.player.board, self.enemies, "Start Turn")
-        if(len(self.player.deck)):
-            new_card = random.choice(self.player.deck)
-            self.player.deck.remove(new_card)
-            self.player.hand.append(new_card)
+        if(len(self.player.deck) == 0):
+            self.player.deck = self.player.stored_deck.copy()
+        
+        new_card = random.choice(self.player.deck)
+        self.player.deck.remove(new_card)
+        self.player.hand.append(new_card)
         self.attack_queue = []
         self.turn = 1
         self.player.mana = min(START_MANA + self.round_count, MAX_MANA)
@@ -93,7 +109,6 @@ class Game:
                 self.summon(Demon("Quasit"))
                 self.summon(Demon("Quasit"))
                 self.summon(Demon("Quasit"))
-        print(output)
         self.last = self.player.board
         self.player.board = [d for d in self.player.board if d.alive]
         self.enemies = [c for c in self.enemies if c.alive]
@@ -105,7 +120,16 @@ class Game:
                 self.attack_queue.append((Celestial('deck', pygame.Rect(10000, 0, 1, 1)), (Celestial('deck', pygame.Rect(10000, 1.6, 1, 1)))))
                 
     def handle_input(self, event):
+        from demon import Demon
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_6:
+                self.secret_counter += 1
+                if(self.secret_counter == 3):
+                    self.player.hand.append(Demon("The Devil"))
         if event.type == pygame.MOUSEBUTTONDOWN:
+            if(self.state == "title"):
+                self.state = 'battle'
+                return
             # Check if clicking on a card in hand
             for idx, card in enumerate(self.player.hand):
                 if card.rect.collidepoint(event.pos):
@@ -149,8 +173,12 @@ class Game:
                     card.attack += 6
             
     def generate_encounter(self):
+        from demon import Demon
         self.player.mana = 3
-        print(self.player.stored_deck)
+        self.turn = 1
+        self.round_count = 0
+        self.attack_queue = []
+        self.player.stored_deck.append(Demon(random.choice(demon_list)))
         self.player.deck = self.player.stored_deck.copy()
         self.player.hand = []
         self.player.board = []
@@ -277,7 +305,9 @@ class Game:
                         self.generate_encounter()
                     if(self.player.health <= 0):
                         pygame.quit()
-                    
+            elif self.state == "title":
+                draw_titlescreen(screen, self.background)
+                pygame.display.flip()
             clock.tick(60)
 
 
