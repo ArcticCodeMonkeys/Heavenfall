@@ -3,9 +3,12 @@ import random
 import copy
 from player import Player
 from celestial import Celestial
-from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held, draw_arrows, draw_unit, UNIT_WIDTH, UNIT_HEIGHT, PADDING
+from UI import draw_board, draw_hand, draw_deck, draw_mana, draw_end_turn_button, draw_held, draw_arrows, draw_unit, draw_health, UNIT_WIDTH, UNIT_HEIGHT, PADDING
 
 encounter_list = [
+    [Celestial("Angel"), Celestial("Angel")],
+    [Celestial("Angel"), Celestial("Angel")],
+    [Celestial("Angel"), Celestial("Angel")],
     [Celestial("Angel"), Celestial("Angel")]
 ]
 # Basic settings
@@ -15,11 +18,13 @@ CARD_DRAW = 1
 START_MANA = 3
 ANIMATION_ACCEL = 2
 ANIMATION_MAX_SPEED = 50
+MAX_BOARD_SIZE = 7
+MAX_HEALTH = 10
 
 class Game:
     def __init__(self):
         self.state = "battle"
-        self.player = Player(30, START_MANA)
+        self.player = Player(MAX_HEALTH, START_MANA)
         self.enemies = []  # List of Celestial enemies in the current battle
         self.turn = 1  # 1 for player, 2 for enemies, 3 for begin player turn
         self.round_count = 0
@@ -42,9 +47,9 @@ class Game:
         self.drawn_card = None
         self.hand_pos = None
         self.deck_pos = None
+        self.last = self.player.board
 
     def start_turn(self):
-        self.resolve_deaths()
         for d in self.player.board:
             d.passive(self.player.board, self.enemies, "Start Turn")
         if(len(self.player.deck)):
@@ -59,20 +64,37 @@ class Game:
         from demon import Demon
         for attacker, enemy in self.attack_queue:
             if(type(attacker) == Demon):
-                enemy.take_damage(attacker.attack * attacker.dmg_modifier)
+                enemy.take_damage(attacker.attack)
+                if(attacker.name == "Pit Fiend"):
+                    attacker.can_attack = True
+                    second_target = random.choice(self.enemies)
+                    second_target.take_damage(attacker.attack)
         for celestial in self.enemies:
-            targets = celestial.choose_action(self.player.board)
+            targets = celestial.choose_action(self.player.board, self.player)
             for d in self.player.board:
                 d.passive(self.player.board, self.enemies, "Attacked")
-            if(targets != None):
+            if(targets != None and len(targets) != 0):
                 for target in targets:
                     self.attack_queue.append((celestial, target))  # Queue attacker-target pairs
                     self.attack_queue.append((celestial, Celestial("Angel", celestial.rect)))
+            else:
+                self.attack_queue.append((celestial, Celestial("Angel", self.hand_pos)))
+                self.attack_queue.append((celestial, Celestial("Angel", celestial.rect)))
         self.draw_cards(CARD_DRAW)
         self.turn = 3  # Switch to animation mode
+        self.round_count += 1
 
     def resolve_deaths(self):
         # Remove dead demons and celestials from their respective lists
+        from demon import Demon
+        output = ""
+        for d in self.last:
+            if d not in self.player.board and d.name == 'Orcus':
+                self.summon(Demon("Quasit"))
+                self.summon(Demon("Quasit"))
+                self.summon(Demon("Quasit"))
+        print(output)
+        self.last = self.player.board
         self.player.board = [d for d in self.player.board if d.alive]
         self.enemies = [c for c in self.enemies if c.alive]
 
@@ -99,7 +121,7 @@ class Game:
                     return
 
             # Check if clicking on a celestial (after selecting a demon)
-            if self.selected_demon:
+            if self.selected_demon and all(self.selected_demon not in atk for atk in self.attack_queue):
                 for celestial in self.enemies:
                     if celestial.rect.collidepoint(event.pos):
                         self.selected_celestial = celestial
@@ -112,16 +134,31 @@ class Game:
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.dragging_card:
                 if self.board.collidepoint(event.pos) and self.player.mana >= self.dragging_card.cost:
-                    self.player.board.append(self.dragging_card)
-                    self.dragging_card.passive(self.player.board, self.enemies, "Summon")
-                    for d in self.player.board:
-                        if d.name == "Lucifer":
-                            self.dragging_card.attack += 6
                     self.player.hand.pop(self.dragged_index)
                     self.player.mana -= self.dragging_card.cost
+                    self.summon(self.dragging_card)
+                    self.resolve_deaths()
                 self.dragging_card = None  # Stop dragging the card after drop
 
+    def summon(self, card):
+        if(len(self.player.board) < MAX_BOARD_SIZE):
+            self.player.board.append(card)
+            card.passive(self.player.board, self.enemies, "Summon")
+            for d in self.player.board:
+                if d.name == "The Devil":
+                    card.attack += 6
+            
     def generate_encounter(self):
+        self.player.mana = 3
+        print(self.player.stored_deck)
+        self.player.deck = self.player.stored_deck.copy()
+        self.player.hand = []
+        self.player.board = []
+        if(len(self.player.deck) >= 3):
+            for _ in range(3):
+                new_card = random.choice(self.player.deck)
+                self.player.deck.remove(new_card)
+                self.player.hand.append(new_card)
         self.enemies = encounter_list[random.randint(0, len(encounter_list) - 1)]
 
     def animate_attack(self, attacking_card, target_card):
@@ -190,6 +227,7 @@ class Game:
             draw_deck(screen, self.deck_pos)
         draw_hand(screen, self.player.hand, self.dragging_card, self.dragged_index)
         draw_mana(screen, self.player.mana, min(START_MANA+self.round_count, MAX_MANA))
+        draw_health(screen, self.player.health, MAX_HEALTH)
         if(self.turn != 3):
             draw_arrows(screen, self.attack_queue)
         if(self.attacking_card):
@@ -211,24 +249,31 @@ class Game:
         self.hand_pos = pygame.Rect(screen.get_width()//2 - UNIT_WIDTH, screen.get_height() - UNIT_HEIGHT, UNIT_WIDTH, UNIT_HEIGHT)
         self.deck_pos = pygame.Rect(screen.get_width() - UNIT_WIDTH - PADDING, screen.get_height()-UNIT_HEIGHT - PADDING, UNIT_WIDTH, UNIT_HEIGHT)
         self.generate_encounter()
+        
         running = True
         while running:
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False  # Exit the game loop if the window is closed
-                self.handle_input(event)
+                if(self.turn != 3):
+                    self.handle_input(event)
 
             if self.state == "battle":
+                
                 
                 # Process the attack queue if we're in animation mode
                 if self.turn == 3:
                     self.update_animation(screen)
                     self.process_attack_queue()
                 else:
+                    self.resolve_deaths()
                     self.refresh_screen(screen)
-
-            
+                    if(len(self.enemies) == 0):
+                        self.generate_encounter()
+                    if(self.player.health <= 0):
+                        pygame.quit()
+                    
             clock.tick(60)
 
         pygame.quit()  # Clean up

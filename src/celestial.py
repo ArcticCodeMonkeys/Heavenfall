@@ -4,7 +4,7 @@ from UI import ENEMY_WIDTH, ENEMY_HEIGHT, UNIT_WIDTH, UNIT_HEIGHT
 class Celestial:
     def __init__(self, name, rect=None):
         stats = {
-            "Angel": [10, ["4x1", "1x3"]],
+            "Angel": [10, ["3x1", "1x2"]],
             "deck":[0, ["1x1","1x1"]]
         }
         self.actions = stats[name][1]
@@ -27,7 +27,7 @@ class Celestial:
     def die(self):
         self.alive = False
 
-    def choose_action(self, demons):
+    def choose_action(self, demons, player):
         if not self.alive:
             return
         
@@ -35,14 +35,18 @@ class Celestial:
         target_count, damage = self.parse_action(action)
         
         if target_count == "a":  # "a" for all
+            if(len(demons) == 0):
+                player.health -= damage
             for demon in demons:
                 demon.take_damage(damage)
         else:
             targets = []
             for _ in range(target_count):
+                if(len(demons) == 0):
+                    player.health -= damage
                 if demons:
                     target = random.choice(demons)
-                    target.take_damage(damage)
+                    target.take_damage(damage, self, demons)
                     targets.append(target)
             return targets
 

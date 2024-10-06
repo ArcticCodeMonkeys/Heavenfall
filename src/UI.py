@@ -60,6 +60,11 @@ def draw_mana(screen, mana, max_mana):
     mana_text = font.render(f'Mana: {mana}/{max_mana}', True, (255, 255, 255))
     screen.blit(mana_text, (10, 10))
 
+def draw_health(screen, hp, max_hp):
+    font = pygame.font.Font(None, 36)
+    mana_text = font.render(f'Health: {hp}/{max_hp}', True, (255, 255, 255))
+    screen.blit(mana_text, (screen.get_width() - 200, 10))
+
 def draw_end_turn_button(screen):
     button_rect = pygame.Rect(PADDING, screen.get_height() - 60, 100, 40)  # Position in the bottom left corner
     pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Blue button
@@ -99,7 +104,7 @@ def draw_board(screen, player, enemies, board, background, animating, attacking_
     screen.fill((0, 0, 0))  # Clear screen with black background
     background = pygame.transform.smoothscale(background, screen.get_size())
     screen.blit(background, (0, 0))
-    pygame.draw.rect(screen, (0, 0, 0), board)
+    #pygame.draw.rect(screen, (0, 0, 0), board)
  
     # Calculate total width of player's demons
     total_player_width = len(player.board) * UNIT_WIDTH + (len(player.board) - 1) * PADDING

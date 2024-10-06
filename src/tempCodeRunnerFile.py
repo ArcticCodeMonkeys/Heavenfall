@@ -1,1 +1,1 @@
-card.rect
+alive

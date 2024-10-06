@@ -16,13 +16,13 @@ class Demon:
             "Yeenoghu":[2, 3, 2],
             "Zariel":[1, 7, 3],
             "Imp":[2, 1, 1],
-            "Lucifer":[6, 6, 6]
+            "The Devil":[0, 6, 6]
         }
         self.name = name
         self.attack = stats[name][0]
         self.hp = stats[name][1]
         self.hpMax = stats[name][1]
-        self.cost = stats[name][0]
+        self.cost = stats[name][2]
         self.has_battlecry = False
         if(self.name in ["Yeenoghu"]):
             self.has_battlecry = True
@@ -50,7 +50,7 @@ class Demon:
         if(self.name == "Succubus"):
             attacker.dmg_modifier *= 0.5
         if(self.name == "Rakshasa"):
-            if(dmg < 3):
+            if(dmg < 2):
                 self.hp += dmg
         if self.hp <= 0:
             self.die(allies)
@@ -69,14 +69,15 @@ class Demon:
                 self.attack = 3
             case "Yeenoghu":
                 if(status == "Summon"):
-                    consume = random.choice(allies)
-                    allies.remove(consume)
-                    consume.die(allies)
-                    target = random.choice(allies)
-                    target.hp += consume.hpMax
-                    target.hpMax += consume.hpMax
-                    target.attack += consume.attack
-            case "Lucifer":
+                    if(len(allies) > 1):
+                        consume = random.choice(allies)
+                        allies.remove(consume)
+                        consume.die(allies)
+                        target = random.choice(allies)
+                        target.hp += consume.hpMax
+                        target.hpMax += consume.hpMax
+                        target.attack += consume.attack
+            case "The Devil":
                 if(status == "Summon"):
                     for ally in allies:
                         if(ally != self):
@@ -99,5 +100,6 @@ class Demon:
             if self.name == "Imp":
                 target = random.choice(allies)
                 target.hp = min(target.hp + self.attack, target.hpMax) 
-            if self.name == "Lucifer":
+            if self.name == "The Devil":
                 ally.attack -= 6
+
